@@ -332,6 +332,7 @@ class ProfilePage extends ConsumerWidget {
               SpringButton(
                 onTap: () {
                   if (!kIsWeb) HapticFeedback.heavyImpact();
+                  Navigator.pushNamed(context, AppRoutes.sos);
                 },
                 child: Container(
                   width: double.infinity,
@@ -464,7 +465,7 @@ class _FeatureCard extends StatelessWidget {
   String? _getRoute(String label) {
     switch (label) {
       case 'Meal Timer':
-        return AppRoutes.nutrition;
+        return AppRoutes.mealReminder;
       case 'Stay Mindful':
         return AppRoutes.meditation;
       case 'Your Workout':
@@ -472,11 +473,11 @@ class _FeatureCard extends StatelessWidget {
       case 'Your Diet':
         return AppRoutes.nutrition;
       case 'Habit Tracker':
-        return null;
+        return AppRoutes.habitTracker;
       case 'Period Tracker':
         return AppRoutes.periodTracker;
       case 'Stress Help':
-        return AppRoutes.meditation;
+        return AppRoutes.stressHelp;
       case 'Hydration':
         return AppRoutes.hydration;
       case 'AI Chatbot':

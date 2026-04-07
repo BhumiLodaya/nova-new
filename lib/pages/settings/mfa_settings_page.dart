@@ -345,9 +345,65 @@ class _MfaSettingsPageState extends ConsumerState<MfaSettingsPage>
                 const SizedBox(height: 16),
                 _buildStatusMessage(),
               ],
+
+              const SizedBox(height: 20),
+              _buildSecurityChecklistCard(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityChecklistCard() {
+    final isProtected = _enrolled.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Security Checklist',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          _checkItem('MFA enabled', isProtected),
+          _checkItem('Recovery method prepared', isProtected),
+          const SizedBox(height: 10),
+          Text(
+            'Tip: Keep your phone number up to date and avoid disabling MFA unless strictly necessary.',
+            style: TextStyle(color: Colors.grey[700]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _checkItem(String text, bool done) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(
+            done ? Icons.check_circle : Icons.radio_button_unchecked,
+            color: done ? Colors.green : Colors.grey,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
       ),
     );
   }

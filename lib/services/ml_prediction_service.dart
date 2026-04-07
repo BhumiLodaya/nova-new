@@ -8,11 +8,15 @@ import '../models/symptom_model.dart';
 
 /// Service to communicate with FastAPI ML backend
 class MLPredictionService {
-  // Local dev: http://localhost:8000
-  // Production: https://novahealth-backend.onrender.com
-  static const String baseUrl = kDebugMode
-      ? 'http://localhost:8000'
-      : 'https://novahealth-backend.onrender.com';
+  static const String _productionUrl = 'https://novahealth-backend.onrender.com';
+
+  // In debug mode, use local backend for both web and mobile dev.
+  static String get baseUrl {
+    if (kDebugMode) {
+      return kIsWeb ? 'http://127.0.0.1:8000' : 'http://localhost:8000';
+    }
+    return _productionUrl;
+  }
   
   /// Predict comprehensive health risk
   Future<HealthRiskPrediction> predictHealthRisk({

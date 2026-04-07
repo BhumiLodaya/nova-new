@@ -249,6 +249,116 @@ class SupabaseService {
     }
   }
 
+  /// Sync period cycles to cloud
+  Future<bool> syncPeriodCycles(List<Map<String, dynamic>> cycles) async {
+    if (!isAvailable || cycles.isEmpty) return false;
+    try {
+      final dataWithTimestamp = cycles
+          .map((c) => {
+                ...c,
+                'synced_at': DateTime.now().toIso8601String(),
+              })
+          .toList();
+
+      await _client!.from('period_cycles').upsert(dataWithTimestamp);
+      return true;
+    } catch (e) {
+      debugPrint('Error syncing period cycles: $e');
+      return false;
+    }
+  }
+
+  /// Sync symptoms to cloud
+  Future<bool> syncSymptoms(List<Map<String, dynamic>> symptoms) async {
+    if (!isAvailable || symptoms.isEmpty) return false;
+    try {
+      final dataWithTimestamp = symptoms
+          .map((s) => {
+                ...s,
+                'synced_at': DateTime.now().toIso8601String(),
+              })
+          .toList();
+
+      await _client!.from('symptom_data').upsert(dataWithTimestamp);
+      return true;
+    } catch (e) {
+      debugPrint('Error syncing symptoms: $e');
+      return false;
+    }
+  }
+
+  /// Sync meditation sessions to cloud
+  Future<bool> syncMeditationSessions(List<Map<String, dynamic>> sessions) async {
+    if (!isAvailable || sessions.isEmpty) return false;
+    try {
+      final dataWithTimestamp = sessions
+          .map((s) => {
+                ...s,
+                'synced_at': DateTime.now().toIso8601String(),
+              })
+          .toList();
+
+      await _client!.from('meditation_sessions').upsert(dataWithTimestamp);
+      return true;
+    } catch (e) {
+      debugPrint('Error syncing meditation sessions: $e');
+      return false;
+    }
+  }
+
+  /// Sync sugar logs to cloud
+  Future<bool> syncSugarLogs(List<Map<String, dynamic>> sugarLogs) async {
+    if (!isAvailable || sugarLogs.isEmpty) return false;
+    try {
+      final dataWithTimestamp = sugarLogs
+          .map((s) => {
+                ...s,
+                'synced_at': DateTime.now().toIso8601String(),
+              })
+          .toList();
+
+      await _client!.from('sugar_logs').upsert(dataWithTimestamp);
+      return true;
+    } catch (e) {
+      debugPrint('Error syncing sugar logs: $e');
+      return false;
+    }
+  }
+
+  /// Sync habit tracker daily state to cloud
+  Future<bool> syncHabitTracking(List<Map<String, dynamic>> habits) async {
+    if (!isAvailable || habits.isEmpty) return false;
+    try {
+      final dataWithTimestamp = habits
+          .map((h) => {
+                ...h,
+                'synced_at': DateTime.now().toIso8601String(),
+              })
+          .toList();
+
+      await _client!.from('habit_tracking').upsert(dataWithTimestamp);
+      return true;
+    } catch (e) {
+      debugPrint('Error syncing habit tracking: $e');
+      return false;
+    }
+  }
+
+  /// Sync SOS profile to cloud
+  Future<bool> syncSosProfile(Map<String, dynamic> sosProfile) async {
+    if (!isAvailable || sosProfile.isEmpty) return false;
+    try {
+      await _client!.from('sos_profiles').upsert({
+        ...sosProfile,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error syncing SOS profile: $e');
+      return false;
+    }
+  }
+
   // ==================== AI Predictions & Recommendations ====================
 
   /// Get health predictions based on user data
@@ -367,6 +477,12 @@ class SupabaseService {
     List<Map<String, dynamic>>? healthMetrics,
     List<Map<String, dynamic>>? moodLogs,
     List<Map<String, dynamic>>? foodLogs,
+    List<Map<String, dynamic>>? periodCycles,
+    List<Map<String, dynamic>>? symptoms,
+    List<Map<String, dynamic>>? meditationSessions,
+    List<Map<String, dynamic>>? sugarLogs,
+    List<Map<String, dynamic>>? habitTracking,
+    Map<String, dynamic>? sosProfile,
   }) async {
     final results = <String, bool>{};
 
@@ -384,6 +500,25 @@ class SupabaseService {
     }
     if (foodLogs != null && foodLogs.isNotEmpty) {
       results['food_logs'] = await syncFoodLogs(foodLogs);
+    }
+    if (periodCycles != null && periodCycles.isNotEmpty) {
+      results['period_cycles'] = await syncPeriodCycles(periodCycles);
+    }
+    if (symptoms != null && symptoms.isNotEmpty) {
+      results['symptoms'] = await syncSymptoms(symptoms);
+    }
+    if (meditationSessions != null && meditationSessions.isNotEmpty) {
+      results['meditation_sessions'] =
+          await syncMeditationSessions(meditationSessions);
+    }
+    if (sugarLogs != null && sugarLogs.isNotEmpty) {
+      results['sugar_logs'] = await syncSugarLogs(sugarLogs);
+    }
+    if (habitTracking != null && habitTracking.isNotEmpty) {
+      results['habit_tracking'] = await syncHabitTracking(habitTracking);
+    }
+    if (sosProfile != null && sosProfile.isNotEmpty) {
+      results['sos_profile'] = await syncSosProfile(sosProfile);
     }
 
     return results;

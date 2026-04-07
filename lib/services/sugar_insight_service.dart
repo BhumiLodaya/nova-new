@@ -6,7 +6,7 @@ import 'ml_prediction_service.dart';
 /// Calls the FastAPI backend for cause-effect sugar insights,
 /// with a local offline fallback.
 class SugarInsightService {
-  static const String _baseUrl = MLPredictionService.baseUrl;
+  String get _baseUrl => MLPredictionService.baseUrl;
 
   /// POST /predict/sugar-insight
   /// Body: { sugarType, bmi, steps }

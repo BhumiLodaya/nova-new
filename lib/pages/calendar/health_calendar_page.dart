@@ -6,11 +6,14 @@ import '../../config/theme.dart';
 import '../../providers/tracking_providers.dart';
 import '../../providers/wellness_providers.dart';
 import '../../providers/health_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/database_service.dart';
 import '../../models/period_cycle_model.dart';
 import '../../models/symptom_model.dart';
 import '../../models/workout_model.dart';
 import '../../models/mood_log_model.dart';
 import '../../models/hydration_model.dart';
+import '../../models/food_log_model.dart';
 
 class HealthCalendarPage extends ConsumerStatefulWidget {
   const HealthCalendarPage({super.key});
@@ -26,11 +29,14 @@ class _HealthCalendarPageState extends ConsumerState<HealthCalendarPage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
+    final db = DatabaseService();
     final periodCycles = ref.watch(periodCyclesProvider);
-    final symptoms = ref.watch(symptomsProvider);
-    final workouts = ref.watch(workoutsProvider);
-    final moodLogs = ref.watch(moodLogsProvider);
-    final hydrationLogs = ref.watch(hydrationProvider);
+    final symptoms = user != null ? db.getUserSymptoms(user.id) : <SymptomModel>[];
+    final workouts = user != null ? db.getUserWorkouts(user.id) : <WorkoutModel>[];
+    final moodLogs = user != null ? db.getUserMoodLogs(user.id) : <MoodLogModel>[];
+    final hydrationLogs = user != null ? db.getUserHydrationLogs(user.id) : <HydrationModel>[];
+    final foodLogs = user != null ? db.getUserFoodLogs(user.id) : <FoodLogModel>[];
 
     // Get data for selected day
     final selectedDaySymptoms = symptoms.where((s) =>
@@ -41,6 +47,8 @@ class _HealthCalendarPageState extends ConsumerState<HealthCalendarPage> {
         isSameDay(m.timestamp, _selectedDay)).toList();
     final selectedDayHydration = hydrationLogs.where((h) =>
         isSameDay(h.timestamp, _selectedDay)).toList();
+    final selectedDayMeals = foodLogs.where((f) =>
+      isSameDay(f.timestamp, _selectedDay)).toList();
 
     return Scaffold(
       backgroundColor: AppTheme.lightGreen,
@@ -74,6 +82,8 @@ class _HealthCalendarPageState extends ConsumerState<HealthCalendarPage> {
               lastDay: DateTime.now().add(const Duration(days: 365)),
               focusedDay: _focusedDay,
               calendarFormat: _calendarFormat,
+              availableGestures: AvailableGestures.all,
+              pageAnimationEnabled: true,
               selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
               onDaySelected: (selectedDay, focusedDay) {
                 setState(() {
@@ -176,6 +186,11 @@ class _HealthCalendarPageState extends ConsumerState<HealthCalendarPage> {
                     markers.add(_buildMarker(Colors.red, 3));
                   }
 
+                  // Meal marker
+                  if (foodLogs.any((f) => isSameDay(f.timestamp, day))) {
+                    markers.add(_buildMarker(const Color(0xFFFF7043), 4));
+                  }
+
                   return markers.isNotEmpty
                       ? Positioned(
                           bottom: 1,
@@ -258,6 +273,7 @@ class _HealthCalendarPageState extends ConsumerState<HealthCalendarPage> {
                   const SizedBox(height: 20),
                   Expanded(
                     child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -393,11 +409,47 @@ class _HealthCalendarPageState extends ConsumerState<HealthCalendarPage> {
                               ),
                             ),
 
+                          // Meals
+                          if (selectedDayMeals.isNotEmpty)
+                            _buildDaySection(
+                              icon: Icons.restaurant,
+                              title: 'Meals (${selectedDayMeals.length})',
+                              color: const Color(0xFFFF7043),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: selectedDayMeals.map((m) =>
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFFFF7043),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            '${m.mealType}: ${m.foodName} (${m.calories.toInt()} cal)',
+                                            style: TextStyle(color: Colors.grey[700]),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ).toList(),
+                              ),
+                            ),
+
                           // No data message with enhanced styling
                           if (selectedDaySymptoms.isEmpty &&
                               selectedDayWorkouts.isEmpty &&
                               selectedDayMoods.isEmpty &&
                               selectedDayHydration.isEmpty &&
+                              selectedDayMeals.isEmpty &&
                               !_isPeriodDay(periodCycles, _selectedDay))
                             Center(
                               child: Padding(
@@ -545,6 +597,7 @@ class _HealthCalendarPageState extends ConsumerState<HealthCalendarPage> {
             _buildLegendItem(Colors.orange, 'Workout'),
             _buildLegendItem(Colors.yellow.shade700, 'Mood Log'),
             _buildLegendItem(Colors.red, 'Symptom'),
+            _buildLegendItem(const Color(0xFFFF7043), 'Meals'),
             const SizedBox(height: 16),
             Text(
               'Multiple markers may appear on a single day if you logged different types of data.',

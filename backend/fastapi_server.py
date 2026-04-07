@@ -403,7 +403,7 @@ def analyze_symptom_risks(symptoms: List[Dict]) -> Optional[Dict]:
     
     # Symptom pattern mapping to probable conditions
     symptom_patterns = {
-        'Cardiovascular': ['chest pain', 'shortness of breath', 'irregular heartbeat', 'palpitations', 'dizziness', 'fainting'],
+        'Cardiovascular': ['chest pain', 'shortness of breath', 'irregular heartbeat', 'palpitations', 'fainting'],
         'Respiratory': ['cough', 'shortness of breath', 'wheezing', 'chest tightness', 'difficulty breathing'],
         'Gastrointestinal': ['nausea', 'vomiting', 'diarrhea', 'abdominal pain', 'bloating', 'constipation', 'heartburn'],
         'Neurological': ['headache', 'migraine', 'dizziness', 'numbness', 'tingling', 'confusion', 'memory loss'],
@@ -425,7 +425,12 @@ def analyze_symptom_risks(symptoms: List[Dict]) -> Optional[Dict]:
         # Handle both 'type' and 'symptomType' field names
         symptom_type_raw = symptom.get('type') or symptom.get('symptomType') or symptom.get('symptom_type', '')
         symptom_type = str(symptom_type_raw).lower().strip()
-        severity = int(symptom.get('severity', 0))
+        severity_raw = symptom.get('severity', 0)
+        try:
+            severity = int(float(severity_raw))
+        except (ValueError, TypeError):
+            severity = 5
+        severity = max(1, min(10, severity))
         
         print(f"[DEBUG] Processing symptom: type='{symptom_type}', severity={severity}")  # Debug
         
@@ -465,13 +470,31 @@ def analyze_symptom_risks(symptoms: List[Dict]) -> Optional[Dict]:
     symptom_count = len(symptoms)
     avg_severity = total_severity / symptom_count if symptom_count > 0 else 0
     
-    if symptom_count >= 5 or max_severity >= 8 or any('chest pain' in s.get('type', '').lower() for s in symptoms):
+    red_flag_patterns = [
+        'chest pain',
+        'shortness of breath',
+        'difficulty breathing',
+        'fainting',
+        'seizure',
+        'confusion',
+        'stroke',
+    ]
+    has_red_flag = False
+    for symptom in symptoms:
+        symptom_text = str(
+            symptom.get('type') or symptom.get('symptomType') or symptom.get('symptom_type', '')
+        ).lower()
+        if any(flag in symptom_text for flag in red_flag_patterns):
+            has_red_flag = True
+            break
+
+    if (has_red_flag and max_severity >= 7) or (symptom_count >= 4 and avg_severity >= 7) or (symptom_count >= 2 and max_severity >= 9):
         risk_level = "Critical"
         urgency = "Urgent Care - Seek immediate medical attention"
-    elif symptom_count >= 3 or avg_severity >= 6:
+    elif has_red_flag or (symptom_count >= 3 and avg_severity >= 6) or (symptom_count >= 2 and max_severity >= 8):
         risk_level = "High"
         urgency = "Seek Medical Attention - Schedule appointment within 24-48 hours"
-    elif symptom_count >= 2 or avg_severity >= 4:
+    elif symptom_count >= 2 or avg_severity >= 5 or max_severity >= 7:
         risk_level = "Moderate"
         urgency = "Schedule Checkup - Consult healthcare provider within a week"
     else:
@@ -693,7 +716,7 @@ async def predict_health_risk(request: HealthRiskRequest):
             )
         
         # ===== OVERALL RISK SCORE =====
-        risk_score = 50.0  # baseline
+        risk_score = 20.0  # baseline
         
         # Adjust based on obesity risk
         if obesity_risk.riskLevel in ['Obesity_Type_II', 'Obesity_Type_III']:
@@ -706,14 +729,16 @@ async def predict_health_risk(request: HealthRiskRequest):
             risk_score += 10
         
         # Adjust based on lifestyle
-        if lifestyle_features['symptom_count'] > 3:
-            risk_score += 10
+        if lifestyle_features['symptom_count'] >= 4:
+            risk_score += 12
+        elif lifestyle_features['symptom_count'] >= 2:
+            risk_score += 6
         if lifestyle_features['exercise_duration'] < 20:
-            risk_score += 10
+            risk_score += 8
         if lifestyle_features['daily_water_ml'] < 1500:
             risk_score += 5
         if lifestyle_features['sleep_hours'] < 6:
-            risk_score += 10
+            risk_score += 8
         
         risk_score = min(100, max(0, risk_score))
         

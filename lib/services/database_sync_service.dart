@@ -9,6 +9,10 @@ import '../models/hydration_model.dart';
 import '../models/health_metric_model.dart';
 import '../models/mood_log_model.dart';
 import '../models/food_log_model.dart';
+import '../models/period_cycle_model.dart';
+import '../models/symptom_model.dart';
+import '../models/meditation_session_model.dart';
+import '../models/sugar_log_model.dart';
 import '../models/user_model.dart';
 import '../utils/constants.dart';
 
@@ -68,6 +72,12 @@ class DatabaseSyncService {
       List<Map<String, dynamic>> unsyncedHealthMetrics = [];
       List<Map<String, dynamic>> unsyncedMoodLogs = [];
       List<Map<String, dynamic>> unsyncedFoodLogs = [];
+      List<Map<String, dynamic>> unsyncedPeriodCycles = [];
+      List<Map<String, dynamic>> unsyncedSymptoms = [];
+      List<Map<String, dynamic>> unsyncedMeditationSessions = [];
+      List<Map<String, dynamic>> unsyncedSugarLogs = [];
+      List<Map<String, dynamic>> unsyncedHabitTracking = [];
+      Map<String, dynamic> sosProfile = {};
       
       if (_sqliteService.isAvailable) {
         // Desktop/Mobile: Get from SQLite
@@ -87,6 +97,14 @@ class DatabaseSyncService {
         unsyncedFoodLogs = await _getFoodLogsFromHive();
       }
 
+      // Additional data currently persisted in Hive/settings for all platforms.
+      unsyncedPeriodCycles = await _getPeriodCyclesFromHive();
+      unsyncedSymptoms = await _getSymptomsFromHive();
+      unsyncedMeditationSessions = await _getMeditationSessionsFromHive();
+      unsyncedSugarLogs = await _getSugarLogsFromHive();
+      unsyncedHabitTracking = await _getHabitTrackingFromSettings();
+      sosProfile = await _getSosProfileFromSettings();
+
       // Sync user profiles to Supabase
       if (unsyncedUserProfiles.isNotEmpty) {
         await _syncUserProfilesToSupabase(unsyncedUserProfiles);
@@ -99,6 +117,12 @@ class DatabaseSyncService {
         healthMetrics: unsyncedHealthMetrics,
         moodLogs: unsyncedMoodLogs,
         foodLogs: unsyncedFoodLogs,
+        periodCycles: unsyncedPeriodCycles,
+        symptoms: unsyncedSymptoms,
+        meditationSessions: unsyncedMeditationSessions,
+        sugarLogs: unsyncedSugarLogs,
+        habitTracking: unsyncedHabitTracking,
+        sosProfile: sosProfile,
       );
 
       // Mark synced records in SQLite (if available)
@@ -132,16 +156,34 @@ class DatabaseSyncService {
 
       final totalSynced = unsyncedWorkouts.length + unsyncedHydration.length + 
                           unsyncedHealthMetrics.length + unsyncedMoodLogs.length + 
-                          unsyncedFoodLogs.length;
+                          unsyncedFoodLogs.length + unsyncedPeriodCycles.length +
+                          unsyncedSymptoms.length + unsyncedMeditationSessions.length +
+                          unsyncedSugarLogs.length + unsyncedHabitTracking.length +
+                          (sosProfile.isNotEmpty ? 1 : 0);
+
+      final settings = Hive.box(AppConstants.settingsBox);
+      await settings.put('sync_last_status', 'success');
+      await settings.put('sync_last_timestamp', DateTime.now().toIso8601String());
+      await settings.put('sync_last_count', totalSynced);
+      await settings.put('sync_last_details', results.map((k, v) => MapEntry(k, v ? 'ok' : 'failed')));
+
       debugPrint('✅ Data sync completed! Synced $totalSynced records to Supabase');
       debugPrint('   - Workouts: ${unsyncedWorkouts.length}');
       debugPrint('   - Hydration: ${unsyncedHydration.length}');
       debugPrint('   - Health Metrics: ${unsyncedHealthMetrics.length}');
       debugPrint('   - Mood Logs: ${unsyncedMoodLogs.length}');
       debugPrint('   - Food Logs: ${unsyncedFoodLogs.length}');
+      debugPrint('   - Period Cycles: ${unsyncedPeriodCycles.length}');
+      debugPrint('   - Symptoms: ${unsyncedSymptoms.length}');
+      debugPrint('   - Meditation Sessions: ${unsyncedMeditationSessions.length}');
+      debugPrint('   - Sugar Logs: ${unsyncedSugarLogs.length}');
       return true;
     } catch (e) {
       debugPrint('Error during data sync: $e');
+      final settings = Hive.box(AppConstants.settingsBox);
+      await settings.put('sync_last_status', 'failed');
+      await settings.put('sync_last_timestamp', DateTime.now().toIso8601String());
+      await settings.put('sync_last_error', e.toString());
       return false;
     } finally {
       _isSyncing = false;
@@ -523,6 +565,155 @@ class DatabaseSyncService {
         debugPrint('✅ Restored ${foods.length} food logs');
       }
 
+      // Restore period cycles
+      final periodCycles = await _supabaseService.client
+          ?.from('period_cycles')
+          .select()
+          .eq('user_id', userId);
+
+      if (periodCycles != null && periodCycles.isNotEmpty) {
+        final periodBox = Hive.box<PeriodCycleModel>('period_box');
+        for (final p in periodCycles) {
+          final cycle = PeriodCycleModel(
+            id: p['id'],
+            userId: p['user_id'],
+            startDate: DateTime.parse(p['start_date']),
+            endDate: p['end_date'] != null ? DateTime.parse(p['end_date']) : null,
+            flowIntensity: p['flow_intensity'] ?? 'medium',
+            symptoms: p['symptoms'] != null ? List<String>.from(p['symptoms']) : const [],
+            mood: p['mood'],
+            notes: p['notes'],
+            cycleLength: p['cycle_length'],
+            createdAt: p['created_at'] != null
+                ? DateTime.parse(p['created_at'])
+                : DateTime.now(),
+          );
+          await periodBox.put(cycle.id, cycle);
+        }
+        debugPrint('✅ Restored ${periodCycles.length} period cycles');
+      }
+
+      // Restore symptoms
+      final symptoms = await _supabaseService.client
+          ?.from('symptom_data')
+          .select()
+          .eq('user_id', userId);
+
+      if (symptoms != null && symptoms.isNotEmpty) {
+        final symptomBox = Hive.box<SymptomModel>('symptom_box');
+        for (final s in symptoms) {
+          final symptom = SymptomModel(
+            id: s['id'],
+            userId: s['user_id'],
+            timestamp: DateTime.parse(s['timestamp']),
+            symptomType: s['symptom_type'],
+            severity: (s['severity'] as num).toInt(),
+            bodyPart: s['body_part'],
+            notes: s['notes'],
+            triggers: s['triggers'] != null ? List<String>.from(s['triggers']) : null,
+            createdAt: s['created_at'] != null
+                ? DateTime.parse(s['created_at'])
+                : DateTime.parse(s['timestamp']),
+          );
+          await symptomBox.put(symptom.id, symptom);
+        }
+        debugPrint('✅ Restored ${symptoms.length} symptoms');
+      }
+
+      // Restore meditation sessions
+      final meditation = await _supabaseService.client
+          ?.from('meditation_sessions')
+          .select()
+          .eq('user_id', userId);
+
+      if (meditation != null && meditation.isNotEmpty) {
+        final meditationBox = Hive.box<MeditationSessionModel>('meditation_box');
+        for (final m in meditation) {
+          final session = MeditationSessionModel(
+            id: m['id'],
+            userId: m['user_id'],
+            timestamp: DateTime.parse(m['timestamp']),
+            type: m['type'],
+            durationMinutes: (m['duration_minutes'] as num).toInt(),
+            exerciseName: m['exercise_name'],
+            notes: m['notes'],
+            completed: m['completed'] ?? true,
+            createdAt: m['created_at'] != null
+                ? DateTime.parse(m['created_at'])
+                : DateTime.parse(m['timestamp']),
+          );
+          await meditationBox.put(session.id, session);
+        }
+        debugPrint('✅ Restored ${meditation.length} meditation sessions');
+      }
+
+      // Restore sugar logs
+      final sugarLogs = await _supabaseService.client
+          ?.from('sugar_logs')
+          .select()
+          .eq('user_id', userId);
+
+      if (sugarLogs != null && sugarLogs.isNotEmpty) {
+        final sugarBox = Hive.box<SugarLogModel>('sugar_log_box');
+        for (final s in sugarLogs) {
+          final log = SugarLogModel(
+            id: s['id'],
+            userId: s['user_id'],
+            loggedAt: DateTime.parse(s['logged_at']),
+            sugarType: s['sugar_type'],
+            label: s['label'],
+            estimatedSugarGrams: (s['estimated_sugar_grams'] as num).toDouble(),
+            estimatedCalories: (s['estimated_calories'] as num).toDouble(),
+            note: s['note'],
+            xpEarned: (s['xp_earned'] as num?)?.toInt() ?? 10,
+          );
+          await sugarBox.put(log.id, log);
+        }
+        debugPrint('✅ Restored ${sugarLogs.length} sugar logs');
+      }
+
+      // Restore habit tracker snapshots into settings.
+      final habits = await _supabaseService.client
+          ?.from('habit_tracking')
+          .select()
+          .eq('user_id', userId);
+
+      if (habits != null && habits.isNotEmpty) {
+        final settings = Hive.box(AppConstants.settingsBox);
+        for (final h in habits) {
+          final dayKey = (h['day_key'] ?? '').toString();
+          if (dayKey.isEmpty) continue;
+          final completed = h['completed_habits'];
+          final completedList = completed is List
+              ? completed.map((e) => e.toString()).toList()
+              : <String>[];
+
+          await settings.put('habit_tracker_$dayKey', completedList);
+        }
+        debugPrint('✅ Restored ${habits.length} habit tracking entries');
+      }
+
+      // Restore SOS profile into settings.
+      final sosRows = await _supabaseService.client
+          ?.from('sos_profiles')
+          .select()
+          .eq('user_id', userId)
+          .limit(1);
+
+      if (sosRows != null && sosRows.isNotEmpty) {
+        final settings = Hive.box(AppConstants.settingsBox);
+        final sos = sosRows.first;
+        await settings.put(
+          'sos_primary_contact',
+          (sos['primary_contact'] ?? '').toString(),
+        );
+        await settings.put(
+          'sos_medical_note',
+          (sos['medical_note'] ?? '').toString(),
+        );
+        debugPrint('✅ Restored SOS profile');
+      }
+
       debugPrint('✅ User data restore completed!');
     } catch (e) {
       debugPrint('⚠️ Could not restore user data from cloud (network issue or Supabase unavailable): $e');
@@ -766,5 +957,165 @@ class DatabaseSyncService {
       debugPrint('Error reading food logs from Hive: $e');
       return [];
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _getPeriodCyclesFromHive() async {
+    try {
+      final box = Hive.box<PeriodCycleModel>('period_box');
+      return box.values
+          .map((p) => {
+                'id': p.id,
+                'user_id': p.userId,
+                'start_date': p.startDate.toIso8601String(),
+                'end_date': p.endDate?.toIso8601String(),
+                'flow_intensity': p.flowIntensity,
+                'symptoms': p.symptoms,
+                'mood': p.mood,
+                'notes': p.notes,
+                'cycle_length': p.cycleLength,
+                'created_at': p.createdAt.toIso8601String(),
+              })
+          .toList();
+    } catch (e) {
+      debugPrint('Error reading period cycles from Hive: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _getSymptomsFromHive() async {
+    try {
+      final box = Hive.box<SymptomModel>('symptom_box');
+      return box.values
+          .map((s) => {
+                'id': s.id,
+                'user_id': s.userId,
+                'timestamp': s.timestamp.toIso8601String(),
+                'symptom_type': s.symptomType,
+                'severity': s.severity,
+                'body_part': s.bodyPart,
+                'notes': s.notes,
+                'triggers': s.triggers,
+                'created_at': s.createdAt.toIso8601String(),
+              })
+          .toList();
+    } catch (e) {
+      debugPrint('Error reading symptoms from Hive: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _getMeditationSessionsFromHive() async {
+    try {
+      final box = Hive.box<MeditationSessionModel>('meditation_box');
+      return box.values
+          .map((m) => {
+                'id': m.id,
+                'user_id': m.userId,
+                'timestamp': m.timestamp.toIso8601String(),
+                'type': m.type,
+                'duration_minutes': m.durationMinutes,
+                'exercise_name': m.exerciseName,
+                'notes': m.notes,
+                'completed': m.completed,
+                'created_at': m.createdAt.toIso8601String(),
+              })
+          .toList();
+    } catch (e) {
+      debugPrint('Error reading meditation sessions from Hive: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _getSugarLogsFromHive() async {
+    try {
+      final box = Hive.box<SugarLogModel>('sugar_log_box');
+      return box.values
+          .map((s) => {
+                'id': s.id,
+                'user_id': s.userId,
+                'logged_at': s.loggedAt.toIso8601String(),
+                'sugar_type': s.sugarType,
+                'label': s.label,
+                'estimated_sugar_grams': s.estimatedSugarGrams,
+                'estimated_calories': s.estimatedCalories,
+                'note': s.note,
+                'xp_earned': s.xpEarned,
+              })
+          .toList();
+    } catch (e) {
+      debugPrint('Error reading sugar logs from Hive: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _getHabitTrackingFromSettings() async {
+    try {
+      final settings = Hive.box(AppConstants.settingsBox);
+      final rows = <Map<String, dynamic>>[];
+
+      for (final key in settings.keys) {
+        final rawKey = key.toString();
+        if (!rawKey.startsWith('habit_tracker_')) continue;
+
+        final value = settings.get(key);
+        if (value is! List) continue;
+
+        final day = rawKey.replaceFirst('habit_tracker_', '');
+        rows.add({
+          'id': 'habit_${day.replaceAll('-', '')}',
+          'user_id': _extractCurrentUserIdFromSettings(settings),
+          'day_key': day,
+          'completed_habits': value.map((e) => e.toString()).toList(),
+        });
+      }
+      return rows.where((r) => (r['user_id'] ?? '').toString().isNotEmpty).toList();
+    } catch (e) {
+      debugPrint('Error reading habit tracking from settings: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> _getSosProfileFromSettings() async {
+    try {
+      final settings = Hive.box(AppConstants.settingsBox);
+      final userId = _extractCurrentUserIdFromSettings(settings);
+      if (userId.isEmpty) return {};
+
+      final contact = settings.get('sos_primary_contact');
+      final note = settings.get('sos_medical_note');
+      if ((contact == null || contact.toString().isEmpty) &&
+          (note == null || note.toString().isEmpty)) {
+        return {};
+      }
+
+      return {
+        'user_id': userId,
+        'primary_contact': contact?.toString(),
+        'medical_note': note?.toString(),
+      };
+    } catch (e) {
+      debugPrint('Error reading SOS profile from settings: $e');
+      return {};
+    }
+  }
+
+  String _extractCurrentUserIdFromSettings(Box settings) {
+    try {
+      final userBox = Hive.box<UserModel>(AppConstants.userBox);
+      if (userBox.isNotEmpty) {
+        final user = userBox.values.first;
+        if (user.id.isNotEmpty) {
+          return user.id;
+        }
+      }
+    } catch (_) {
+      // Fall back to settings-based lookup below.
+    }
+
+    final auth = settings.get('auth_user');
+    if (auth is Map && auth['id'] != null) {
+      return auth['id'].toString();
+    }
+    return '';
   }
 }

@@ -4,11 +4,55 @@ import '../../config/theme.dart';
 import '../../config/routes.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/auth_service.dart';
+import '../../services/database_service.dart';
 import '../../utils/demo_data_seeder.dart';
 import '../../utils/data_export.dart';
 
-class SettingsPage extends ConsumerWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  String? _lastSyncStatus;
+  String? _lastSyncTimestamp;
+  int _lastSyncCount = 0;
+  bool _syncingNow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSyncStatus();
+  }
+
+  void _loadSyncStatus() {
+    final db = DatabaseService();
+    setState(() {
+      _lastSyncStatus = db.getSetting('sync_last_status')?.toString();
+      _lastSyncTimestamp = db.getSetting('sync_last_timestamp')?.toString();
+      _lastSyncCount = (db.getSetting('sync_last_count', defaultValue: 0) as num).toInt();
+    });
+  }
+
+  Future<void> _syncNow() async {
+    setState(() {
+      _syncingNow = true;
+    });
+    final ok = await DatabaseService().syncToCloud();
+    if (!mounted) return;
+    _loadSyncStatus();
+    setState(() {
+      _syncingNow = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Cloud sync completed' : 'Cloud sync failed'),
+        backgroundColor: ok ? Colors.green : Colors.red,
+      ),
+    );
+  }
 
   Future<void> _seedDemoData(BuildContext context, WidgetRef ref) async {
     final user = ref.read(currentUserProvider);
@@ -238,7 +282,7 @@ class SettingsPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
 
     return Scaffold(
@@ -314,6 +358,40 @@ class SettingsPage extends ConsumerWidget {
 
           // Data & Privacy Section
           _buildSectionHeader(context, 'Data & Privacy'),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Cloud Sync Status',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text('Status: ${_lastSyncStatus ?? 'Not synced yet'}'),
+                if (_lastSyncTimestamp != null)
+                  Text('Last sync: $_lastSyncTimestamp'),
+                Text('Last synced records: $_lastSyncCount'),
+                const SizedBox(height: 10),
+                ElevatedButton.icon(
+                  onPressed: _syncingNow ? null : _syncNow,
+                  icon: _syncingNow
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cloud_sync),
+                  label: Text(_syncingNow ? 'Syncing...' : 'Sync Now'),
+                ),
+              ],
+            ),
+          ),
           _buildListTile(
             context,
             icon: Icons.download,

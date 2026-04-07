@@ -29,10 +29,16 @@ class AppRoutes {
   // Nutrition routes
   static const String nutrition = '/nutrition';
   static const String mealPlan = '/meal-plan';
+  static const String mealReminder = '/meal-reminder';
 
   // Wellness routes
   static const String moodTracker = '/mood-tracker';
   static const String meditation = '/meditation';
+  static const String stressHelp = '/stress-help';
+
+  // Profile tools routes
+  static const String habitTracker = '/habit-tracker';
+  static const String sos = '/sos';
   
   // ML Prediction & Health Insights routes
   static const String healthRisk = '/health-risk';

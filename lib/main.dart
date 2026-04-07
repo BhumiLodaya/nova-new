@@ -20,8 +20,12 @@ import 'pages/tracking/symptoms_page.dart';
 import 'pages/tracking/period_tracker_page.dart';
 import 'pages/nutrition/nutrition_page.dart';
 import 'pages/nutrition/meal_plan_page.dart';
+import 'pages/nutrition/meal_reminder_page.dart';
 import 'pages/wellness/mood_tracker_page.dart';
 import 'pages/wellness/meditation_page.dart';
+import 'pages/wellness/stress_help_page.dart';
+import 'pages/profile/habit_tracker_page.dart';
+import 'pages/settings/sos_page.dart';
 import 'pages/health_risk_page.dart';
 import 'pages/chatbot/chatbot_page.dart';
 import 'pages/settings/sync_test_page.dart';
@@ -114,8 +118,12 @@ class MyApp extends ConsumerWidget {
         AppRoutes.periodTracker: (context) => const PeriodTrackerPage(),
         AppRoutes.nutrition: (context) => const NutritionPage(),
         AppRoutes.mealPlan: (context) => const MealPlanPage(),
+        AppRoutes.mealReminder: (context) => const MealReminderPage(),
         AppRoutes.moodTracker: (context) => const MoodTrackerPage(),
         AppRoutes.meditation: (context) => const MeditationPage(),
+        AppRoutes.stressHelp: (context) => const StressHelpPage(),
+        AppRoutes.habitTracker: (context) => const HabitTrackerPage(),
+        AppRoutes.sos: (context) => const SosPage(),
         AppRoutes.healthRisk: (context) => const HealthRiskPage(),
         AppRoutes.chatbot: (context) => const ChatbotPage(),
         AppRoutes.leaderboard: (context) => const LeaderboardPage(),

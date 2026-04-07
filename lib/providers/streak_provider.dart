@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/sugar_log_model.dart';
 import 'auth_provider.dart';
+import '../services/database_service.dart';
 
 // ─────────────────────────────────────────────────────────
 //  Streak State
@@ -78,21 +79,44 @@ class StreakNotifier extends StateNotifier<StreakState> {
       return;
     }
 
+    final db = DatabaseService();
     final box = await _openBox();
-    final allLogs = box.values
-        .where((l) => l.userId == userId)
-        .toList()
-      ..sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
+    final loggedDays = <String>{};
 
-    if (allLogs.isEmpty) {
-      state = const StreakState();
-      return;
+    // Sugar logs (legacy streak source)
+    for (final log in box.values.where((l) => l.userId == userId)) {
+      loggedDays.add(_dayKey(log.loggedAt));
     }
 
-    // Build a set of calendar days (yyyy-mm-dd) that have logs.
-    final loggedDays = <String>{};
-    for (final log in allLogs) {
-      loggedDays.add(_dayKey(log.loggedAt));
+    // Broader health activity logs
+    for (final hydration in db.getUserHydrationLogs(userId)) {
+      loggedDays.add(_dayKey(hydration.timestamp));
+    }
+    for (final workout in db.getUserWorkouts(userId)) {
+      loggedDays.add(_dayKey(workout.date));
+    }
+    for (final food in db.getUserFoodLogs(userId)) {
+      loggedDays.add(_dayKey(food.timestamp));
+    }
+    for (final mood in db.getUserMoodLogs(userId)) {
+      loggedDays.add(_dayKey(mood.timestamp));
+    }
+    for (final symptom in db.getUserSymptoms(userId)) {
+      loggedDays.add(_dayKey(symptom.timestamp));
+    }
+    for (final metric in db.getUserHealthMetrics(userId)) {
+      loggedDays.add(_dayKey(metric.date));
+    }
+    for (final cycle in db.getUserPeriodCycles(userId)) {
+      loggedDays.add(_dayKey(cycle.startDate));
+      if (cycle.endDate != null) {
+        loggedDays.add(_dayKey(cycle.endDate!));
+      }
+    }
+
+    if (loggedDays.isEmpty) {
+      state = const StreakState();
+      return;
     }
 
     final now = DateTime.now();

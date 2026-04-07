@@ -15,7 +15,6 @@ import '../../providers/sugar_log_provider.dart';
 import '../../providers/streak_provider.dart';
 import '../../services/database_service.dart';
 import '../../utils/helpers.dart';
-import '../../widgets/quick_log_widget.dart';
 import '../../widgets/success_animation_overlay.dart';
 import '../../widgets/streak_milestone_popup.dart';
 import '../../widgets/signup_gate_card.dart';
@@ -98,10 +97,6 @@ class DashboardPage extends ConsumerWidget {
 
                   // ─── SIGNUP GATE ───
                   const SignupGateCard(),
-
-                  // ─── SUGAR QUICK LOG (Drawer) ───
-                  const QuickLogWidget(),
-                  const SizedBox(height: 20),
 
                   // ═══════════════════════════════════════
                   //  BENTO GRID: 2x2 stat cards

@@ -13,7 +13,7 @@ import '../models/period_cycle_model.dart';
 class HealthInsightsEngine {
   static const int _baselineDays = 90;
   static const int _trendWindowDays = 14;
-  static const int _minimumDataDays = 3; // Lowered for faster insights
+  static const int _minimumDataDays = 2; // Show insights earlier with sparse logs
 
   /// Generate comprehensive health insights from user data
   UserHealthInsights generateInsights({
@@ -30,6 +30,8 @@ class HealthInsightsEngine {
       healthMetrics,
       workouts,
       hydrationLogs,
+      moodLogs,
+      foodLogs,
     );
 
     if (daysOfData < _minimumDataDays) {
@@ -859,18 +861,27 @@ class HealthInsightsEngine {
     List<HealthMetricModel> metrics,
     List<WorkoutModel> workouts,
     List<HydrationModel> hydration,
+    List<MoodLogModel> moods,
+    List<FoodLogModel> foods,
   ) {
-    final dates = <DateTime>[
-      ...metrics.map((m) => m.date),
-      ...workouts.map((w) => w.date),
-      ...hydration.map(
-        (h) => DateTime(h.timestamp.year, h.timestamp.month, h.timestamp.day),
-      ),
-    ];
+    final dayKeys = <String>{};
 
-    if (dates.isEmpty) return 0;
+    for (final m in metrics) {
+      dayKeys.add('${m.date.year}-${m.date.month}-${m.date.day}');
+    }
+    for (final w in workouts) {
+      dayKeys.add('${w.date.year}-${w.date.month}-${w.date.day}');
+    }
+    for (final h in hydration) {
+      dayKeys.add('${h.timestamp.year}-${h.timestamp.month}-${h.timestamp.day}');
+    }
+    for (final mood in moods) {
+      dayKeys.add('${mood.timestamp.year}-${mood.timestamp.month}-${mood.timestamp.day}');
+    }
+    for (final food in foods) {
+      dayKeys.add('${food.timestamp.year}-${food.timestamp.month}-${food.timestamp.day}');
+    }
 
-    final oldest = dates.reduce((a, b) => a.isBefore(b) ? a : b);
-    return DateTime.now().difference(oldest).inDays;
+    return dayKeys.length;
   }
 }

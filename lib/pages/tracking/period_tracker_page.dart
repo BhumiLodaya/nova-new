@@ -212,6 +212,7 @@ class _PeriodTrackerPageState extends ConsumerState<PeriodTrackerPage> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
+                              color: Colors.black87,
                             ),
                           ),
                         ],
@@ -219,13 +220,18 @@ class _PeriodTrackerPageState extends ConsumerState<PeriodTrackerPage> {
                       const SizedBox(height: 12),
                       Text(
                         'Started: ${activeCycle.startDate.day}/${activeCycle.startDate.month}/${activeCycle.startDate.year}',
+                        style: const TextStyle(color: Colors.black87),
                       ),
-                      Text('Flow: ${activeCycle.flowIntensity}'),
+                      Text(
+                        'Flow: ${activeCycle.flowIntensity}',
+                        style: const TextStyle(color: Colors.black87),
+                      ),
                       const SizedBox(height: 12),
                       ElevatedButton(
                         onPressed: () => _endPeriod(activeCycle),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.pink,
+                          foregroundColor: Colors.white,
                         ),
                         child: const Text('End Period'),
                       ),
@@ -370,6 +376,7 @@ class _PeriodTrackerPageState extends ConsumerState<PeriodTrackerPage> {
                             : 'Active',
                       ),
                       trailing: Text(cycle.flowIntensity),
+                      textColor: Colors.black87,
                       onLongPress: () => _deleteCycle(cycle.id),
                     ),
                   );
