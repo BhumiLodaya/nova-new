@@ -1,7 +1,7 @@
 <div align="center">
 
-# � NovaHealth – Beat the Sugar Spike  
-### AI-Powered Cross-Platform Health & Sugar Intelligence Platform
+# � NovaHealth  
+
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.7+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)](https://python.org)
